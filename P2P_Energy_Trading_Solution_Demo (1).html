@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Energy Trading Solution - Interactive Demo</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); }
+        }
+        @keyframes flow {
+            0% { stroke-dashoffset: 1000; }
+            100% { stroke-dashoffset: 0; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .pulse-glow { animation: pulse-glow 2s infinite; }
+        .flow-animation { animation: flow 3s linear infinite; }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        .spin-slow { animation: spin-slow 20s linear infinite; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .energy-particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, #22c55e, transparent);
+            border-radius: 50%;
+            animation: float 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Token Component - Animated blockchain token
+        const EnergyToken = ({ x, y, value, delay = 0 }) => (
+            <div 
+                className="absolute w-10 h-10 float-animation"
+                style={{ 
+                    left: x, 
+                    top: y, 
+                    animationDelay: `${delay}s`,
+                    zIndex: 10
+                }}
+            >
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg pulse-glow">
+                    <span className="text-xs font-bold text-white">⚡{value}</span>
+                </div>
+            </div>
+        );
+
+        // House Component with Solar Panel
+        const House = ({ x, y, name, type, energy, isActive, onClick }) => {
+            const isProducer = type === 'producer';
+            return (
+                <div 
+                    className={`absolute cursor-pointer transition-all duration-300 ${isActive ? 'scale-110' : 'hover:scale-105'}`}
+                    style={{ left: x, top: y }}
+                    onClick={onClick}
+                >
+                    <div className={`glass-card rounded-xl p-3 ${isActive ? 'ring-2 ring-green-400' : ''}`}>
+                        {/* Solar Panel */}
+                        <div className="relative mb-2">
+                            <div className={`w-16 h-8 ${isProducer ? 'bg-gradient-to-r from-blue-600 to-blue-400' : 'bg-gray-600'} rounded grid grid-cols-4 gap-px p-1`}>
+                                {[...Array(8)].map((_, i) => (
+                                    <div key={i} className="bg-blue-300/30 rounded-sm" />
+                                ))}
+                            </div>
+                            {isProducer && (
+                                <div className="absolute -top-2 -right-2">
+                                    <div className="w-4 h-4 bg-yellow-400 rounded-full animate-pulse shadow-lg" />
+                                </div>
+                            )}
+                        </div>
+                        {/* House Body */}
+                        <div className="w-16 h-12 bg-gradient-to-b from-slate-700 to-slate-800 rounded-lg flex items-center justify-center">
+                            <span className="text-2xl">{isProducer ? '🏠' : '🏢'}</span>
+                        </div>
+                        {/* Info */}
+                        <div className="mt-2 text-center">
+                            <p className="text-white text-xs font-semibold">{name}</p>
+                            <p className={`text-xs ${isProducer ? 'text-green-400' : 'text-orange-400'}`}>
+                                {isProducer ? `+${energy} kWh` : `-${energy} kWh`}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Smart Contract Visual
+        const SmartContract = ({ isExecuting, transaction }) => (
+            <div className={`glass-card rounded-xl p-4 transition-all duration-500 ${isExecuting ? 'ring-2 ring-cyan-400 scale-105' : ''}`}>
+                <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-3 h-3 rounded-full ${isExecuting ? 'bg-cyan-400 animate-pulse' : 'bg-gray-500'}`} />
+                    <span className="text-cyan-400 font-mono text-sm">Smart Contract</span>
+                </div>
+                <div className="bg-black/50 rounded-lg p-3 font-mono text-xs">
+                    <p className="text-green-400">// Auto-executing trade</p>
+                    <p className="text-gray-400">contract.execute(&#123;</p>
+                    <p className="text-yellow-400 ml-4">seller: "{transaction?.seller || '...'}"</p>
+                    <p className="text-yellow-400 ml-4">buyer: "{transaction?.buyer || '...'}"</p>
+                    <p className="text-purple-400 ml-4">amount: {transaction?.amount || '0'} kWh</p>
+                    <p className="text-blue-400 ml-4">price: £{transaction?.price || '0.00'}</p>
+                    <p className="text-gray-400">&#125;);</p>
+                    {isExecuting && (
+                        <p className="text-green-400 mt-2 animate-pulse">✓ Transaction confirmed!</p>
+                    )}
+                </div>
+            </div>
+        );
+
+        // AI Prediction Panel
+        const AIPrediction = ({ predictions }) => (
+            <div className="glass-card rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                        <span className="text-lg">🧠</span>
+                    </div>
+                    <span className="text-purple-400 font-semibold">AI Prediction Engine</span>
+                </div>
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm">Solar Generation</span>
+                        <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-1000"
+                                    style={{ width: `${predictions.solar}%` }}
+                                />
+                            </div>
+                            <span className="text-yellow-400 text-sm">{predictions.solar}%</span>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm">Demand Forecast</span>
+                        <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-blue-400 to-cyan-500 transition-all duration-1000"
+                                    style={{ width: `${predictions.demand}%` }}
+                                />
+                            </div>
+                            <span className="text-blue-400 text-sm">{predictions.demand}%</span>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm">Optimal Trade Time</span>
+                        <span className="text-green-400 text-sm font-semibold">{predictions.optimalTime}</span>
+                    </div>
+                    <div className="mt-3 p-2 bg-green-900/30 rounded-lg border border-green-500/30">
+                        <p className="text-green-400 text-xs">
+                            💡 Recommendation: {predictions.recommendation}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Blockchain Visualization
+        const BlockchainVisual = ({ blocks }) => (
+            <div className="glass-card rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">⛓️</span>
+                    <span className="text-blue-400 font-semibold">Blockchain Ledger</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                    {blocks.map((block, i) => (
+                        <div key={i} className="flex items-center flex-shrink-0">
+                            <div className="glass-card rounded-lg p-2 min-w-[80px]">
+                                <p className="text-gray-400 text-[10px]">Block #{block.id}</p>
+                                <p className="text-white text-xs font-mono">{block.hash.slice(0, 8)}...</p>
+                                <p className="text-green-400 text-[10px]">{block.energy} kWh</p>
+                            </div>
+                            {i < blocks.length - 1 && (
+                                <div className="w-4 h-0.5 bg-gradient-to-r from-blue-500 to-transparent" />
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // IoT Meter Component
+        const IoTMeter = ({ readings, isConnected }) => (
+            <div className="glass-card rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">📡</span>
+                        <span className="text-teal-400 font-semibold">IoT Smart Meter</span>
+                    </div>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-[10px]">Voltage</p>
+                        <p className="text-white font-mono">{readings.voltage}V</p>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-[10px]">Current</p>
+                        <p className="text-white font-mono">{readings.current}A</p>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-[10px]">Power</p>
+                        <p className="text-green-400 font-mono">{readings.power}W</p>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-[10px]">Frequency</p>
+                        <p className="text-white font-mono">{readings.frequency}Hz</p>
+                    </div>
+                </div>
+                <div className="mt-3 text-center">
+                    <p className="text-[10px] text-gray-400">Last sync: {readings.lastSync}</p>
+                </div>
+            </div>
+        );
+
+        // Connection Lines SVG
+        const ConnectionLines = ({ activeConnection }) => (
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
+                <defs>
+                    <linearGradient id="energyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+                        <stop offset="50%" stopColor="#22c55e" stopOpacity="1" />
+                        <stop offset="100%" stopColor="#22c55e" stopOpacity="0.3" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                {/* Connection from House 1 to House 3 */}
+                <path
+                    d="M 130 180 Q 300 100 470 180"
+                    fill="none"
+                    stroke={activeConnection === 1 ? "#22c55e" : "#334155"}
+                    strokeWidth={activeConnection === 1 ? "3" : "2"}
+                    strokeDasharray={activeConnection === 1 ? "10 5" : "none"}
+                    className={activeConnection === 1 ? "flow-animation" : ""}
+                    filter={activeConnection === 1 ? "url(#glow)" : "none"}
+                />
+                {/* Connection from House 2 to House 4 */}
+                <path
+                    d="M 130 350 Q 300 280 470 350"
+                    fill="none"
+                    stroke={activeConnection === 2 ? "#22c55e" : "#334155"}
+                    strokeWidth={activeConnection === 2 ? "3" : "2"}
+                    strokeDasharray={activeConnection === 2 ? "10 5" : "none"}
+                    className={activeConnection === 2 ? "flow-animation" : ""}
+                    filter={activeConnection === 2 ? "url(#glow)" : "none"}
+                />
+            </svg>
+        );
+
+        // Stats Dashboard
+        const StatsDashboard = ({ stats }) => (
+            <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="glass-card rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs">Energy Traded</p>
+                    <p className="text-green-400 font-bold text-lg">{stats.energyTraded} kWh</p>
+                </div>
+                <div className="glass-card rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs">Cost Savings</p>
+                    <p className="text-yellow-400 font-bold text-lg">£{stats.savings}</p>
+                </div>
+                <div className="glass-card rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs">CO₂ Offset</p>
+                    <p className="text-blue-400 font-bold text-lg">{stats.co2Offset} kg</p>
+                </div>
+                <div className="glass-card rounded-lg p-3 text-center">
+                    <p className="text-gray-400 text-xs">Active Traders</p>
+                    <p className="text-purple-400 font-bold text-lg">{stats.activeTraders}</p>
+                </div>
+            </div>
+        );
+
+        // Main App Component
+        const App = () => {
+            const [activeStep, setActiveStep] = useState(0);
+            const [activeHouse, setActiveHouse] = useState(null);
+            const [isTrading, setIsTrading] = useState(false);
+            const [activeConnection, setActiveConnection] = useState(0);
+            const [blocks, setBlocks] = useState([
+                { id: 1, hash: '0x7a8b9c0d', energy: 5 },
+                { id: 2, hash: '0x3e4f5a6b', energy: 8 },
+                { id: 3, hash: '0x1c2d3e4f', energy: 3 },
+            ]);
+            const [stats, setStats] = useState({
+                energyTraded: 156,
+                savings: 42.80,
+                co2Offset: 78,
+                activeTraders: 12
+            });
+            const [predictions, setPredictions] = useState({
+                solar: 85,
+                demand: 62,
+                optimalTime: '14:00 - 16:00',
+                recommendation: 'Sell 3.5 kWh at peak rate'
+            });
+            const [meterReadings, setMeterReadings] = useState({
+                voltage: 238,
+                current: 12.4,
+                power: 2950,
+                frequency: 50.01,
+                lastSync: '< 1s ago'
+            });
+            const [transaction, setTransaction] = useState(null);
+
+            const houses = [
+                { id: 1, x: '5%', y: '25%', name: 'Solar Home', type: 'producer', energy: 8.5 },
+                { id: 2, x: '5%', y: '55%', name: 'Wind House', type: 'producer', energy: 5.2 },
+                { id: 3, x: '70%', y: '25%', name: 'Family Home', type: 'consumer', energy: 6.0 },
+                { id: 4, x: '70%', y: '55%', name: 'Office', type: 'consumer', energy: 4.8 },
+            ];
+
+            const steps = [
+                { title: 'The Problem', icon: '⚠️', color: 'red' },
+                { title: 'Blockchain Tokens', icon: '🪙', color: 'green' },
+                { title: 'Smart Contracts', icon: '📜', color: 'cyan' },
+                { title: 'AI Prediction', icon: '🧠', color: 'purple' },
+                { title: 'IoT Integration', icon: '📡', color: 'teal' },
+                { title: 'Complete Solution', icon: '✨', color: 'yellow' },
+            ];
+
+            // Simulate real-time updates
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setMeterReadings(prev => ({
+                        ...prev,
+                        voltage: 235 + Math.random() * 10,
+                        current: 10 + Math.random() * 5,
+                        power: 2500 + Math.random() * 1000,
+                        frequency: 49.98 + Math.random() * 0.04,
+                        lastSync: '< 1s ago'
+                    }));
+                    
+                    setPredictions(prev => ({
+                        ...prev,
+                        solar: Math.min(100, Math.max(50, prev.solar + (Math.random() - 0.5) * 10)),
+                        demand: Math.min(100, Math.max(30, prev.demand + (Math.random() - 0.5) * 8)),
+                    }));
+                }, 2000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Demo trading animation
+            const startTradeDemo = () => {
+                setIsTrading(true);
+                setActiveConnection(1);
+                setTransaction({
+                    seller: 'Solar Home',
+                    buyer: 'Family Home',
+                    amount: 3.5,
+                    price: 0.28
+                });
+
+                setTimeout(() => {
+                    const newBlock = {
+                        id: blocks.length + 1,
+                        hash: '0x' + Math.random().toString(16).slice(2, 10),
+                        energy: 3.5
+                    };
+                    setBlocks(prev => [...prev.slice(-4), newBlock]);
+                    setStats(prev => ({
+                        ...prev,
+                        energyTraded: prev.energyTraded + 3.5,
+                        savings: +(prev.savings + 0.42).toFixed(2),
+                        co2Offset: prev.co2Offset + 1.75
+                    }));
+                }, 2000);
+
+                setTimeout(() => {
+                    setActiveConnection(2);
+                    setTransaction({
+                        seller: 'Wind House',
+                        buyer: 'Office',
+                        amount: 2.8,
+                        price: 0.25
+                    });
+                }, 4000);
+
+                setTimeout(() => {
+                    setIsTrading(false);
+                    setActiveConnection(0);
+                    setTransaction(null);
+                }, 6000);
+            };
+
+            return (
+                <div className="min-h-screen p-6">
+                    {/* Header */}
+                    <div className="text-center mb-6">
+                        <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                            P2P Electricity Trading Solution
+                        </h1>
+                        <p className="text-gray-400 mt-2">
+                            Blockchain • Smart Contracts • AI • IoT Integration
+                        </p>
+                    </div>
+
+                    {/* Step Navigation */}
+                    <div className="flex justify-center gap-2 mb-6 flex-wrap">
+                        {steps.map((step, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setActiveStep(i)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                                    activeStep === i 
+                                        ? `bg-${step.color}-500/30 text-${step.color}-400 ring-2 ring-${step.color}-400`
+                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                }`}
+                            >
+                                {step.icon} {step.title}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Stats Dashboard */}
+                    <StatsDashboard stats={stats} />
+
+                    {/* Main Content Area */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Left Panel - Information */}
+                        <div className="space-y-4">
+                            {activeStep === 0 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-red-400 font-bold text-lg mb-3">⚠️ The Current Problem</h3>
+                                    <ul className="space-y-2 text-sm text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-400">✗</span>
+                                            <span>Centralized grids can't handle distributed renewable energy</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-400">✗</span>
+                                            <span>Small producers can't sell surplus power locally</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-400">✗</span>
+                                            <span>Clean energy wasted while neighbours pay premium rates</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-400">✗</span>
+                                            <span>No transparency in pricing or energy sources</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-red-400">✗</span>
+                                            <span>300%+ price gap between producer earnings and consumer costs</span>
+                                        </li>
+                                    </ul>
+                                    <div className="mt-4 p-3 bg-red-900/20 rounded-lg border border-red-500/30">
+                                        <p className="text-red-400 text-xs">
+                                            ⚡ Result: Wasted clean energy, high costs, grid instability
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeStep === 1 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-green-400 font-bold text-lg mb-3">🪙 Blockchain Energy Tokens</h3>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        Each kWh of renewable energy becomes a verifiable digital asset on the blockchain.
+                                    </p>
+                                    <ul className="space-y-2 text-sm text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-400">✓</span>
+                                            <span>Transforms electricity into tradeable digital tokens</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-400">✓</span>
+                                            <span>Immutable provenance tracking from generation to consumption</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-400">✓</span>
+                                            <span>Auto-generated renewable energy certificates</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-green-400">✓</span>
+                                            <span>Democratizes carbon credit market access</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {activeStep === 2 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-cyan-400 font-bold text-lg mb-3">📜 Smart Contract Automation</h3>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        Self-executing contracts automatically match buyers and sellers, eliminating middlemen.
+                                    </p>
+                                    <ul className="space-y-2 text-sm text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-cyan-400">✓</span>
+                                            <span>Millisecond trade execution</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-cyan-400">✓</span>
+                                            <span>Instant payment settlement</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-cyan-400">✓</span>
+                                            <span>Dynamic pricing based on supply/demand</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-cyan-400">✓</span>
+                                            <span>Zero transaction costs or intermediaries</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {activeStep === 3 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-purple-400 font-bold text-lg mb-3">🧠 AI-Driven Prediction</h3>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        Machine learning forecasts generation and demand, optimizing trade timing.
+                                    </p>
+                                    <ul className="space-y-2 text-sm text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-purple-400">✓</span>
+                                            <span>Weather-based generation forecasting</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-purple-400">✓</span>
+                                            <span>Behavioural consumption modelling</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-purple-400">✓</span>
+                                            <span>Optimal trading time recommendations</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-purple-400">✓</span>
+                                            <span>40% increase in renewable utilization</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {activeStep === 4 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-teal-400 font-bold text-lg mb-3">📡 IoT Smart Meters</h3>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        Real-time metering bridges physical energy flows with the digital blockchain network.
+                                    </p>
+                                    <ul className="space-y-2 text-sm text-gray-300">
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-teal-400">✓</span>
+                                            <span>Sub-second blockchain synchronization</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-teal-400">✓</span>
+                                            <span>Automated demand response</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-teal-400">✓</span>
+                                            <span>Edge computing for instant decisions</span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-teal-400">✓</span>
+                                            <span>Cryptographic security verification</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {activeStep === 5 && (
+                                <div className="glass-card rounded-xl p-4">
+                                    <h3 className="text-yellow-400 font-bold text-lg mb-3">✨ Complete Solution Impact</h3>
+                                    <div className="space-y-3">
+                                        <div className="p-3 bg-green-900/20 rounded-lg border border-green-500/30">
+                                            <p className="text-green-400 font-semibold">40% Cost Reduction</p>
+                                            <p className="text-gray-400 text-xs">Direct P2P trading eliminates middlemen</p>
+                                        </div>
+                                        <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-500/30">
+                                            <p className="text-blue-400 font-semibold">Zero Wasted Energy</p>
+                                            <p className="text-gray-400 text-xs">AI matches local supply with demand</p>
+                                        </div>
+                                        <div className="p-3 bg-purple-900/20 rounded-lg border border-purple-500/30">
+                                            <p className="text-purple-400 font-semibold">Full Transparency</p>
+                                            <p className="text-gray-400 text-xs">Blockchain tracks every kWh from source to use</p>
+                                        </div>
+                                        <div className="p-3 bg-cyan-900/20 rounded-lg border border-cyan-500/30">
+                                            <p className="text-cyan-400 font-semibold">Grid Resilience</p>
+                                            <p className="text-gray-400 text-xs">Self-organizing micro-grids adapt in real-time</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Blockchain Visual - Always visible */}
+                            <BlockchainVisual blocks={blocks} />
+                        </div>
+
+                        {/* Center - Network Visualization */}
+                        <div className="relative min-h-[400px] glass-card rounded-xl overflow-hidden">
+                            <ConnectionLines activeConnection={activeConnection} />
+                            
+                            {houses.map(house => (
+                                <House 
+                                    key={house.id}
+                                    {...house}
+                                    isActive={activeHouse === house.id}
+                                    onClick={() => setActiveHouse(house.id)}
+                                />
+                            ))}
+
+                            {/* Center Hub */}
+                            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                                <div className="relative">
+                                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center pulse-glow">
+                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+                                            <span className="text-2xl">⚡</span>
+                                        </div>
+                                    </div>
+                                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full">
+                                        <span className="text-white text-xs bg-black/50 px-2 py-1 rounded">P2P Network</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Trading Tokens Animation */}
+                            {isTrading && activeConnection === 1 && (
+                                <>
+                                    <EnergyToken x="20%" y="30%" value="1" delay={0} />
+                                    <EnergyToken x="35%" y="20%" value="1" delay={0.3} />
+                                    <EnergyToken x="50%" y="25%" value="1.5" delay={0.6} />
+                                </>
+                            )}
+                            {isTrading && activeConnection === 2 && (
+                                <>
+                                    <EnergyToken x="20%" y="60%" value="1" delay={0} />
+                                    <EnergyToken x="35%" y="50%" value="0.8" delay={0.3} />
+                                    <EnergyToken x="50%" y="55%" value="1" delay={0.6} />
+                                </>
+                            )}
+
+                            {/* Trade Demo Button */}
+                            <button 
+                                onClick={startTradeDemo}
+                                disabled={isTrading}
+                                className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 px-6 py-2 rounded-full font-semibold transition-all ${
+                                    isTrading 
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:scale-105'
+                                }`}
+                            >
+                                {isTrading ? '⏳ Trading...' : '▶️ Demo Trade'}
+                            </button>
+                        </div>
+
+                        {/* Right Panel - Live Data */}
+                        <div className="space-y-4">
+                            <SmartContract isExecuting={isTrading} transaction={transaction} />
+                            <AIPrediction predictions={predictions} />
+                            <IoTMeter readings={meterReadings} isConnected={true} />
+                        </div>
+                    </div>
+
+                    {/* How It Solves The Problem Section */}
+                    <div className="mt-8 glass-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-white mb-4 text-center">
+                            🔄 How The Problem Is Resolved - Integration Flow
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mb-2">
+                                    <span className="text-2xl">☀️</span>
+                                </div>
+                                <h4 className="text-yellow-400 font-semibold text-sm">1. Generation</h4>
+                                <p className="text-gray-400 text-xs mt-1">Solar/wind produces excess energy</p>
+                            </div>
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center mb-2">
+                                    <span className="text-2xl">📡</span>
+                                </div>
+                                <h4 className="text-teal-400 font-semibold text-sm">2. IoT Metering</h4>
+                                <p className="text-gray-400 text-xs mt-1">Smart meters record & verify instantly</p>
+                            </div>
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-2">
+                                    <span className="text-2xl">🪙</span>
+                                </div>
+                                <h4 className="text-green-400 font-semibold text-sm">3. Tokenization</h4>
+                                <p className="text-gray-400 text-xs mt-1">Energy becomes blockchain tokens</p>
+                            </div>
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mb-2">
+                                    <span className="text-2xl">🧠</span>
+                                </div>
+                                <h4 className="text-purple-400 font-semibold text-sm">4. AI Matching</h4>
+                                <p className="text-gray-400 text-xs mt-1">AI finds optimal buyer & price</p>
+                            </div>
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center mb-2">
+                                    <span className="text-2xl">📜</span>
+                                </div>
+                                <h4 className="text-cyan-400 font-semibold text-sm">5. Auto Trade</h4>
+                                <p className="text-gray-400 text-xs mt-1">Smart contract executes instantly</p>
+                            </div>
+                        </div>
+                        <div className="mt-4 text-center">
+                            <p className="text-gray-300 text-sm">
+                                <span className="text-green-400 font-semibold">Result:</span> Neighbours trade clean energy directly — no middlemen, no waste, up to 40% savings
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-6 text-center text-gray-500 text-xs">
+                        <p>SEL513 Emerging Technologies Portfolio • P2P Energy Trading Solution</p>
+                        <p className="mt-1">Interactive demonstration of blockchain, AI, and IoT integration</p>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
